@@ -8,7 +8,9 @@
 #property version   "1.00"
 #property strict
 
-#include "BoletaBacktest.mqh"
+#include <Trade\Trade.mqh>
+#include <Trade\PositionInfo.mqh>
+#include <Trade\SymbolInfo.mqh>
 
 // Constantes para a interface
 #define BUTTON_WIDTH 100
@@ -28,10 +30,9 @@
 class CBoletaBacktestGUI
 {
 private:
-   COperationManager* m_operationManager;
-   bool m_buyButtonState;
-   bool m_sellButtonState;
-   bool m_closeButtonState;
+   CTrade* m_trade;
+   CPositionInfo m_position;
+   CSymbolInfo m_symbolInfo;
    double m_volume;
    
    // Métodos privados
@@ -91,23 +92,18 @@ private:
    }
    
 public:
-   CBoletaBacktestGUI()
+   CBoletaBacktestGUI(CTrade &trade)
    {
-      m_operationManager = new COperationManager();
-      m_buyButtonState = false;
-      m_sellButtonState = false;
-      m_closeButtonState = false;
+      m_trade = GetPointer(trade);
       m_volume = 0.1;
+      
+      // Inicializa informações do símbolo
+      m_symbolInfo.Name(Symbol());
+      m_symbolInfo.RefreshRates();
    }
    
    ~CBoletaBacktestGUI()
    {
-      if(m_operationManager != NULL)
-      {
-         delete m_operationManager;
-         m_operationManager = NULL;
-      }
-      
       // Remove todos os objetos
       ObjectDelete(0, "BuyButton");
       ObjectDelete(0, "SellButton");
@@ -124,59 +120,70 @@ public:
    
    void Update()
    {
-      // Atualiza o estado dos botões com base nas posições abertas
-      bool hasPositions = false;
-      for(int i = PositionsTotal() - 1; i >= 0; i--)
-      {
-         if(PositionSelectByIndex(i))
-         {
-            hasPositions = true;
-            break;
-         }
-      }
-      
-      ObjectSetInteger(0, "CloseButton", OBJPROP_STATE, hasPositions);
+      m_symbolInfo.RefreshRates();
    }
    
    void ProcessEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
       if(id == CHARTEVENT_OBJECT_CLICK)
       {
+         Print("Processando evento de click - Objeto:", sparam);
+         
          if(sparam == "BuyButton")
          {
-            m_buyButtonState = !m_buyButtonState;
-            ObjectSetInteger(0, "BuyButton", OBJPROP_STATE, m_buyButtonState);
-            
-            if(m_buyButtonState)
+            Print("Enviando ordem de compra. Volume:", m_volume);
+            if(m_trade.Buy(m_volume))
             {
-               m_operationManager.OpenPosition(true, m_volume);
+               Print("Ordem de compra enviada com sucesso! Ticket:", m_trade.ResultOrder(),
+                     " Preço:", m_trade.ResultPrice(),
+                     " Volume:", m_trade.ResultVolume());
+            }
+            else
+            {
+               Print("Erro ao enviar ordem de compra! Erro:", GetLastError(),
+                     " Descrição:", m_trade.ResultRetcodeDescription());
             }
          }
          else if(sparam == "SellButton")
          {
-            m_sellButtonState = !m_sellButtonState;
-            ObjectSetInteger(0, "SellButton", OBJPROP_STATE, m_sellButtonState);
-            
-            if(m_sellButtonState)
+            Print("Enviando ordem de venda. Volume:", m_volume);
+            if(m_trade.Sell(m_volume))
             {
-               m_operationManager.OpenPosition(false, m_volume);
+               Print("Ordem de venda enviada com sucesso! Ticket:", m_trade.ResultOrder(),
+                     " Preço:", m_trade.ResultPrice(),
+                     " Volume:", m_trade.ResultVolume());
+            }
+            else
+            {
+               Print("Erro ao enviar ordem de venda! Erro:", GetLastError(),
+                     " Descrição:", m_trade.ResultRetcodeDescription());
             }
          }
          else if(sparam == "CloseButton")
          {
-            m_closeButtonState = !m_closeButtonState;
-            ObjectSetInteger(0, "CloseButton", OBJPROP_STATE, m_closeButtonState);
+            Print("Fechando todas as posições...");
+            int totalFechadas = 0;
             
-            if(m_closeButtonState)
+            for(int i = PositionsTotal() - 1; i >= 0; i--)
             {
-               for(int i = PositionsTotal() - 1; i >= 0; i--)
+               ulong ticket = PositionGetTicket(i);
+               if(ticket > 0)
                {
-                  if(PositionSelectByIndex(i))
+                  if(m_trade.PositionClose(ticket))
                   {
-                     m_operationManager.ClosePosition(PositionGetInteger(POSITION_TICKET));
+                     Print("Posição ", ticket, " fechada com sucesso! Preço:", m_trade.ResultPrice());
+                     totalFechadas++;
+                  }
+                  else
+                  {
+                     Print("Erro ao fechar posição ", ticket,
+                           " Erro:", GetLastError(),
+                           " Descrição:", m_trade.ResultRetcodeDescription());
                   }
                }
             }
+            
+            Print("Total de posições fechadas: ", totalFechadas);
          }
       }
       else if(id == CHARTEVENT_OBJECT_ENDEDIT && sparam == "VolumeEdit")
@@ -185,6 +192,7 @@ public:
          m_volume = StringToDouble(text);
          if(m_volume <= 0) m_volume = 0.1;
          ObjectSetString(0, "VolumeEdit", OBJPROP_TEXT, DoubleToString(m_volume, 2));
+         Print("Volume atualizado para: ", m_volume);
       }
    }
 }; 
