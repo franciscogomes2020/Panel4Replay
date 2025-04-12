@@ -1,0 +1,21 @@
+# Arquivos compilados
+*.ex4
+*.ex5
+
+# Arquivos de log
+*.log
+
+# Arquivos temporários
+*.tmp
+
+# Arquivos de configuração do MetaTrader
+*.set
+
+# Arquivos de cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db 
