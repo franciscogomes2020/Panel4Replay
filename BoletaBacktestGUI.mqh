@@ -8,7 +8,7 @@
 
 #include <Controls\Dialog.mqh>
 #include <Controls\Button.mqh>
-#include <Controls\Edit.mqh>
+#include <Controls\SpinEdit.mqh>
 #include <Controls\Label.mqh>
 #include <Trade\Trade.mqh>
 
@@ -26,7 +26,7 @@ private:
    CButton           m_buttonBuy;
    CButton           m_buttonSell;
    CButton           m_buttonClose;
-   CEdit             m_editVolume;
+   CSpinEdit         m_spinVolume;
    CLabel            m_labelVolume;
    CTrade*           m_trade;
    double            m_volume;
@@ -35,6 +35,8 @@ private:
    string            m_hackBuyButton;
    string            m_hackSellButton;
    string            m_hackCloseButton;
+   string            m_hackVolumeUpButton;    // Novo botão hack para volume up
+   string            m_hackVolumeDownButton;  // Novo botão hack para volume down
 
 public:
    CBoletaBacktestGUI(CTrade &tradeObj);
@@ -46,7 +48,7 @@ public:
    bool             CreateButtons(void);
    bool             CreateEdits(void);
    bool             CreateHackButtons(void);
-   void             SetVolume(const double volume) { m_volume = volume; }
+   void             SetVolume(const double volume);
    double           GetVolume(void) const { return m_volume; }
    void             CheckHackButtons(void);
    
@@ -69,6 +71,8 @@ CBoletaBacktestGUI::CBoletaBacktestGUI(CTrade &tradeObj)
    m_hackBuyButton = "HackBuyButton_" + IntegerToString(GetTickCount());
    m_hackSellButton = "HackSellButton_" + IntegerToString(GetTickCount());
    m_hackCloseButton = "HackCloseButton_" + IntegerToString(GetTickCount());
+   m_hackVolumeUpButton = "HackVolumeUpButton_" + IntegerToString(GetTickCount());
+   m_hackVolumeDownButton = "HackVolumeDownButton_" + IntegerToString(GetTickCount());
 }
 
 //+------------------------------------------------------------------+
@@ -79,6 +83,8 @@ CBoletaBacktestGUI::~CBoletaBacktestGUI(void)
    ObjectDelete(0, m_hackBuyButton);
    ObjectDelete(0, m_hackSellButton);
    ObjectDelete(0, m_hackCloseButton);
+   ObjectDelete(0, m_hackVolumeUpButton);
+   ObjectDelete(0, m_hackVolumeDownButton);
 }
 
 //+------------------------------------------------------------------+
@@ -98,7 +104,7 @@ bool CBoletaBacktestGUI::Create(const long chart, const string name, const int s
 }
 
 //+------------------------------------------------------------------+
-//| Create the buttons                                                 |
+//| Create buttons                                                     |
 //+------------------------------------------------------------------+
 bool CBoletaBacktestGUI::CreateButtons(void)
 {
@@ -149,7 +155,7 @@ bool CBoletaBacktestGUI::CreateButtons(void)
 }
 
 //+------------------------------------------------------------------+
-//| Create the edit fields                                            |
+//| Create edits                                                       |
 //+------------------------------------------------------------------+
 bool CBoletaBacktestGUI::CreateEdits(void)
 {
@@ -166,12 +172,14 @@ bool CBoletaBacktestGUI::CreateEdits(void)
    
    y += 25;
    
-   // Edit Volume
-   if(!m_editVolume.Create(0, "VolumeEdit", 0, x, y, x + BUTTON_WIDTH, y + EDIT_HEIGHT))
+   // SpinEdit Volume
+   if(!m_spinVolume.Create(0, "VolumeEdit", 0, x, y, x + BUTTON_WIDTH, y + EDIT_HEIGHT))
       return(false);
-   if(!m_editVolume.Text(DoubleToString(m_volume, 2)))
-      return(false);
-   if(!Add(m_editVolume))
+   // Configuramos para trabalhar com 2 casas decimais (multiplicamos por 100)
+   m_spinVolume.MinValue(1);  // 0.01 * 100
+   m_spinVolume.MaxValue(10000);  // 100 * 100
+   m_spinVolume.Value((int)(m_volume * 100.0));  // Converte para inteiro
+   if(!Add(m_spinVolume))
       return(false);
    
    return(true);
@@ -230,7 +238,46 @@ bool CBoletaBacktestGUI::CreateHackButtons(void)
    ObjectSetInteger(0, m_hackCloseButton, OBJPROP_STATE, false);
    ObjectSetInteger(0, m_hackCloseButton, OBJPROP_ZORDER, 999);
    
+   // Hack para os botões do SpinEdit
+   int volume_x = (int)m_spinVolume.Right() - 15;  // Posição do botão de incremento
+   int volume_y = (int)m_spinVolume.Top();
+   int button_height = (int)m_spinVolume.Height() / 2;
+   
+   // Botão Hack Volume Up
+   ObjectCreate(0, m_hackVolumeUpButton, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_XDISTANCE, volume_x);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_YDISTANCE, volume_y);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_XSIZE, 15);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_YSIZE, button_height);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_BGCOLOR, clrNONE);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_COLOR, clrNONE);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_BORDER_COLOR, clrNONE);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_STATE, false);
+   ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_ZORDER, 999);
+   
+   // Botão Hack Volume Down
+   ObjectCreate(0, m_hackVolumeDownButton, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_XDISTANCE, volume_x);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_YDISTANCE, volume_y + button_height);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_XSIZE, 15);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_YSIZE, button_height);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_BGCOLOR, clrNONE);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_COLOR, clrNONE);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_BORDER_COLOR, clrNONE);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_STATE, false);
+   ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_ZORDER, 999);
+   
    return(true);
+}
+
+//+------------------------------------------------------------------+
+//| Set volume                                                         |
+//+------------------------------------------------------------------+
+void CBoletaBacktestGUI::SetVolume(const double volume)
+{
+   m_volume = volume;
+   if(m_spinVolume.Value() != (int)(m_volume * 100.0))
+      m_spinVolume.Value((int)(m_volume * 100.0));
 }
 
 //+------------------------------------------------------------------+
@@ -258,6 +305,25 @@ void CBoletaBacktestGUI::CheckHackButtons(void)
       ObjectSetInteger(0, m_hackCloseButton, OBJPROP_STATE, false);
       OnClickClose();
    }
+   
+   // Verifica botão de volume up
+   if((bool)ObjectGetInteger(0, m_hackVolumeUpButton, OBJPROP_STATE))
+   {
+      ObjectSetInteger(0, m_hackVolumeUpButton, OBJPROP_STATE, false);
+      m_spinVolume.Value(m_spinVolume.Value() + 1);
+      m_volume = (double)m_spinVolume.Value() / 100.0;
+   }
+   
+   // Verifica botão de volume down
+   if((bool)ObjectGetInteger(0, m_hackVolumeDownButton, OBJPROP_STATE))
+   {
+      ObjectSetInteger(0, m_hackVolumeDownButton, OBJPROP_STATE, false);
+      m_spinVolume.Value(m_spinVolume.Value() - 1);
+      m_volume = (double)m_spinVolume.Value() / 100.0;
+   }
+   
+   // Atualiza volume do SpinEdit (convertendo de inteiro para double)
+   m_volume = (double)m_spinVolume.Value() / 100.0;
 }
 
 //+------------------------------------------------------------------+
@@ -363,20 +429,8 @@ bool CBoletaBacktestGUI::OnClickClose(void)
 //+------------------------------------------------------------------+
 void CBoletaBacktestGUI::OnChangeVolume(void)
 {
-   string text = m_editVolume.Text();
-   double newVolume = StringToDouble(text);
-   
-   if(newVolume > 0)
-   {
-      m_volume = newVolume;
-      Print("Volume atualizado para: ", m_volume);
-   }
-   else
-   {
-      m_volume = 0.1;
-      m_editVolume.Text(DoubleToString(m_volume, 2));
-      Print("Volume inválido, restaurado para: ", m_volume);
-   }
+   m_volume = (double)m_spinVolume.Value() / 100.0;
+   Print("Volume atualizado para: ", m_volume);
 }
 
 #endif // __BOLETA_BACKTEST_GUI_MQH__
