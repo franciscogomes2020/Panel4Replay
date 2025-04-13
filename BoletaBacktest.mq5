@@ -5,14 +5,13 @@
 
 // Inputs
 input int InpMagicNumber = 123456;  // Magic Number
+input double InpVolume = 0.1;       // Volume Inicial
 
-// Inclusão dos arquivos necessários
-#include "BoletaBacktest.mqh"
+// Includes
 #include "BoletaBacktestGUI.mqh"
 
 // Variáveis globais
-CBoletaBacktestGUI* g_interface = NULL;
-bool g_isTestMode = false;
+CBoletaBacktestGUI* g_gui = NULL;
 CTrade trade;
 
 //+------------------------------------------------------------------+
@@ -20,10 +19,6 @@ CTrade trade;
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // Verifica se está no testador
-   g_isTestMode = MQLInfoInteger(MQL_TESTER);
-   Print("EA iniciado - Modo testador: ", g_isTestMode);
-   
    // Configura o trade
    trade.SetExpertMagicNumber(InpMagicNumber);
    trade.SetMarginMode();
@@ -31,14 +26,25 @@ int OnInit()
    trade.SetDeviationInPoints(10);
    trade.LogLevel(LOG_LEVEL_ALL);
    
-   // Inicializa a interface gráfica
-   g_interface = new CBoletaBacktestGUI(trade);
-   if(!g_interface.Init())
+   // Cria e inicializa a interface gráfica
+   g_gui = new CBoletaBacktestGUI(trade);
+   if(g_gui == NULL)
    {
-      Print("Erro ao inicializar a interface gráfica");
+      Print("Erro ao criar interface gráfica");
       return INIT_FAILED;
    }
    
+   if(!g_gui.Create(0, "Boleta Backtest", 0, 20, 20, 370, 220))
+   {
+      Print("Erro ao criar painel");
+      delete g_gui;
+      return INIT_FAILED;
+   }
+   
+   g_gui.SetVolume(InpVolume);
+   g_gui.Run();
+   
+   Print("EA iniciado - Magic Number:", InpMagicNumber, " Volume:", InpVolume);
    return(INIT_SUCCEEDED);
 }
 
@@ -47,10 +53,11 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   if(g_interface != NULL)
+   if(g_gui != NULL)
    {
-      delete g_interface;
-      g_interface = NULL;
+      g_gui.Destroy();
+      delete g_gui;
+      g_gui = NULL;
    }
 }
 
@@ -59,76 +66,8 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   if(g_interface != NULL)
-   {
-      // Atualiza a interface
-      g_interface.Update();
-      
-      // Verifica o estado dos botões
-      if((bool)ObjectGetInteger(0, "BuyButton", OBJPROP_STATE))
-      {
-         Print("Botão de Compra pressionado!");
-         // Desativa o botão
-         ObjectSetInteger(0, "BuyButton", OBJPROP_STATE, false);
-         // Envia ordem imediatamente
-         if(trade.Buy(0.1))
-         {
-            Print("Ordem de compra enviada! Ticket:", trade.ResultOrder(), 
-                  " Preço:", trade.ResultPrice(),
-                  " Volume:", trade.ResultVolume());
-         }
-         else
-         {
-            Print("Erro ao enviar ordem de compra! Erro:", GetLastError(),
-                  " Descrição:", trade.ResultRetcodeDescription());
-         }
-      }
-      
-      if((bool)ObjectGetInteger(0, "SellButton", OBJPROP_STATE))
-      {
-         Print("Botão de Venda pressionado!");
-         // Desativa o botão
-         ObjectSetInteger(0, "SellButton", OBJPROP_STATE, false);
-         // Envia ordem imediatamente
-         if(trade.Sell(0.1))
-         {
-            Print("Ordem de venda enviada! Ticket:", trade.ResultOrder(), 
-                  " Preço:", trade.ResultPrice(),
-                  " Volume:", trade.ResultVolume());
-         }
-         else
-         {
-            Print("Erro ao enviar ordem de venda! Erro:", GetLastError(),
-                  " Descrição:", trade.ResultRetcodeDescription());
-         }
-      }
-      
-      if((bool)ObjectGetInteger(0, "CloseButton", OBJPROP_STATE))
-      {
-         Print("Botão de Fechar pressionado!");
-         // Desativa o botão
-         ObjectSetInteger(0, "CloseButton", OBJPROP_STATE, false);
-         // Fecha todas as posições
-         for(int i = PositionsTotal() - 1; i >= 0; i--)
-         {
-            ulong ticket = PositionGetTicket(i);
-            if(ticket > 0)
-            {
-               if(trade.PositionClose(ticket))
-               {
-                  Print("Posição fechada! Ticket:", ticket,
-                        " Preço:", trade.ResultPrice());
-               }
-               else
-               {
-                  Print("Erro ao fechar posição! Ticket:", ticket,
-                        " Erro:", GetLastError(),
-                        " Descrição:", trade.ResultRetcodeDescription());
-               }
-            }
-         }
-      }
-   }
+   if(g_gui != NULL)
+      g_gui.CheckHackButtons();
 }
 
 //+------------------------------------------------------------------+
@@ -139,8 +78,6 @@ void OnChartEvent(const int id,
                   const double &dparam,
                   const string &sparam)
 {
-   if(g_interface != NULL)
-   {
-      g_interface.ProcessEvent(id, lparam, dparam, sparam);
-   }
+   if(g_gui != NULL)
+      g_gui.OnEvent(id, lparam, dparam, sparam);
 } 
