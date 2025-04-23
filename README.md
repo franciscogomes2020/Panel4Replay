@@ -31,4 +31,8 @@ Este projeto implementa um painel de boleta personalizado para o MetaTrader 5 qu
 
 - `BoletaBacktest.mq5` - Arquivo principal do Expert Advisor
 - `BoletaBacktest.mqh` - Arquivo de inclusão com funções auxiliares
-- `BoletaBacktestGUI.mqh` - Implementação da interface gráfica 
+- `BoletaBacktestGUI.mqh` - Implementação da interface gráfica
+
+## VIDEO Criando esse painel, com Vibe Codding
+
+ [![Assista ao vídeo](https://img.youtube.com/vi/buL0AGvEkVU/0.jpg)](https://youtube.com/live/buL0AGvEkVU)
